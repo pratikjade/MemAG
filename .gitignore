@@ -149,3 +149,10 @@ vector_store/
 *.tmp
 *.bak
 *.backup
+
+
+ROADMAP.md
+memory_db/*
+chroma_db/*
+test_output.txt
+test_phase2.py
