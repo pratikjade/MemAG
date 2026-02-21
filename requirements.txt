@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+
+langchain
+langchain-community
+langchain-openai
+
+chromadb
+
+sqlalchemy
+psycopg2-binary
+
+openai
+tiktoken
+numpy
