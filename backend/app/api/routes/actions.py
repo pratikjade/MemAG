@@ -58,3 +58,34 @@ def get_dashboard_summary():
     emails = get_all_emails()
     summary = generate_dashboard_summary(emails)
     return DashboardSummary(**summary)
+
+
+from pydantic import BaseModel
+class AgentRequest(BaseModel):
+    query: str
+
+@router.post("/agent/invoke")
+def invoke_agent(request: AgentRequest):
+    """
+    Invokes the Phase 3 LangGraph orchestrator.
+    The supervisor will route the query to either the memory or email agent.
+    """
+    from app.agents.graph import agent_app
+    from langchain_core.messages import HumanMessage
+    
+    # 1. Provide the initial input state
+    initial_state = {
+        "messages": [HumanMessage(content=request.query)],
+        "memories": [],
+        "current_email": None
+    }
+    
+    # 2. Run the graph compilation to completion
+    result = agent_app.invoke(initial_state)
+    
+    # 3. Return the decisions and outputs from the state
+    return {
+        "route_taken": result.get("next_node"),
+        "agent_response": result.get("output", "No direct output yet - worker nodes are stubs"),
+        "logs": "Supervisor processed the request and routed the graph"
+    }

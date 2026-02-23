@@ -15,6 +15,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Silence noisy third-party loggers
+logging.getLogger("google_genai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,23 +35,15 @@ async def lifespan(app: FastAPI):
     seed_demo_events()
     logger.info("Demo data seeded (if empty)")
 
-    # Score all emails on startup
+    # Score all emails on startup (uses rule-based scoring only for fast boot)
+    # AI-enhanced scoring happens lazily on individual requests
     from app.services.priority_service import score_all_emails
-    scored = score_all_emails()
+    scored = score_all_emails(use_llm=False)
     logger.info(f"Priority scores calculated for {len(scored)} emails")
 
-    # Generate summaries for emails missing them
-    from app.services.email_service import get_all_emails, update_email
-    from app.services.summary_service import generate_email_summary
-    for email in get_all_emails():
-        if not email.get("ai_summary", {}).get("key_points"):
-            summary = generate_email_summary(
-                sender=email["sender"],
-                subject=email["subject"],
-                content=email.get("content", ""),
-            )
-            update_email(email["id"], {"ai_summary": summary})
-    logger.info("AI summaries generated for all emails")
+    # NOTE: AI summaries are generated lazily when emails are requested,
+    # not at startup. This avoids burning Gemini free-tier quota on boot.
+    logger.info("Server ready — AI summaries will be generated on first request")
 
     yield
 

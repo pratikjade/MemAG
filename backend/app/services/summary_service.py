@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Optional
 
-from app.core.llm import get_llm
+from app.core.llm import get_llm, parse_llm_json_response
 from app.core.prompts import EMAIL_SUMMARY_PROMPT, DASHBOARD_SUMMARY_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def generate_email_summary(sender: str, subject: str, content: str) -> dict:
             content=content,
         )
         response = llm.invoke(prompt)
-        result = json.loads(response.content)
+        result = parse_llm_json_response(response)
         return {
             "key_points": result.get("key_points", []),
             "suggested_actions": result.get("suggested_actions", []),
@@ -58,7 +58,7 @@ def generate_dashboard_summary(emails: list[dict]) -> dict:
         )
         prompt = DASHBOARD_SUMMARY_PROMPT.format(emails_summary=emails_text)
         response = llm.invoke(prompt)
-        result = json.loads(response.content)
+        result = parse_llm_json_response(response)
         return result
     except Exception as e:
         logger.error(f"LLM dashboard summary failed: {e}")

@@ -47,7 +47,19 @@ def generate_reply(
                 memory_context=memory_context or "No relevant past context found.",
             )
             response = llm.invoke(prompt)
-            return response.content.strip()
+            # Handle list-type content (Gemini returns this)
+            content_text = response.content
+            if isinstance(content_text, list):
+                parts = []
+                for block in content_text:
+                    if isinstance(block, str):
+                        parts.append(block)
+                    elif isinstance(block, dict) and "text" in block:
+                        parts.append(block["text"])
+                    else:
+                        parts.append(str(block))
+                content_text = "\n".join(parts)
+            return content_text.strip()
         except Exception as e:
             logger.error(f"LLM reply generation failed: {e}")
 

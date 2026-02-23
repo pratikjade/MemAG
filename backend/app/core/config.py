@@ -20,7 +20,17 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
     anthropic_model: str = "claude-3-opus-20240229"
 
-    default_llm_provider: str = "openai"
+    google_api_key: Optional[str] = Field(default=None, alias="GOOGLE_API_KEY")
+    gemini_model: str = "gemini-2.0-flash"
+    gemini_temperature: float = 0.7
+    gemini_max_tokens: int = 2000
+
+    nvidia_api_key: Optional[str] = Field(default=None, alias="NVIDIA_API_KEY")
+    nvidia_model: str = "openai/gpt-oss-20b"
+    nvidia_temperature: float = 0.7
+    nvidia_max_tokens: int = 4096
+
+    default_llm_provider: str = "nvidia"
 
     # ── Embedding Configuration ────────────────────────────────────────
     embedding_model: str = "all-MiniLM-L6-v2"
@@ -64,6 +74,10 @@ class Settings(BaseSettings):
             return bool(self.openai_api_key)
         elif self.default_llm_provider == "anthropic":
             return bool(self.anthropic_api_key)
+        elif self.default_llm_provider == "gemini":
+            return bool(self.google_api_key)
+        elif self.default_llm_provider == "nvidia":
+            return bool(self.nvidia_api_key)
         return False
 
     @property

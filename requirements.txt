@@ -25,6 +25,7 @@ psycopg2-binary
 # === LLM Providers ===
 openai
 tiktoken
+langchain-google-genai
 
 # === Agent Orchestration ===
 langgraph

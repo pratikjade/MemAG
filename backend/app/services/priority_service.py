@@ -12,7 +12,7 @@ import json
 import logging
 from datetime import datetime
 
-from app.core.llm import get_llm
+from app.core.llm import get_llm, parse_llm_json_response
 from app.core.prompts import PRIORITY_SCORING_PROMPT
 from app.services.email_service import get_all_emails, update_email
 
@@ -83,13 +83,17 @@ def _calculate_sender_weight(sender: str) -> tuple[int, str]:
 # ── AI Urgency Scoring ─────────────────────────────────────────────────
 
 def _calculate_ai_urgency(
-    sender: str, subject: str, deadline: str, preview: str
+    sender: str, subject: str, deadline: str, preview: str,
+    use_llm: bool = True,
 ) -> tuple[int, str]:
     """
     Calculate AI urgency score (0-20) using LLM or fallback.
     Returns (score, reasoning).
     """
-    llm = get_llm()
+    if use_llm:
+        llm = get_llm()
+    else:
+        llm = None
 
     if llm is not None:
         try:
@@ -97,7 +101,7 @@ def _calculate_ai_urgency(
                 sender=sender, subject=subject, deadline=deadline, preview=preview
             )
             response = llm.invoke(prompt)
-            result = json.loads(response.content)
+            result = parse_llm_json_response(response)
             score = min(20, max(0, int(result.get("ai_urgency_score", 15))))
             reasoning = result.get("reasoning", "AI-assessed urgency")
             return score, reasoning
@@ -138,7 +142,7 @@ def _fallback_ai_urgency(subject: str, preview: str) -> tuple[int, str]:
 
 # ── Public API ─────────────────────────────────────────────────────────
 
-def score_email(email: dict) -> dict:
+def score_email(email: dict, use_llm: bool = True) -> dict:
     """
     Calculate full priority score for a single email.
     Returns updated email dict with urgency and breakdown.
@@ -152,8 +156,9 @@ def score_email(email: dict) -> dict:
     ai_urgency, urgency_reason = _calculate_ai_urgency(
         sender=email.get("sender", ""),
         subject=email.get("subject", ""),
-        deadline=email.get("deadline", ""),
-        preview=email.get("preview", ""),
+        deadline=email.get("deadline", "No deadline"),
+        preview=email.get("preview", "") or email.get("content", "")[:300] or email.get("subject", ""),
+        use_llm=use_llm,
     )
 
     total_score = deadline_weight + sender_weight + ai_urgency
@@ -169,16 +174,17 @@ def score_email(email: dict) -> dict:
     }
 
 
-def score_all_emails() -> list[dict]:
+def score_all_emails(use_llm: bool = True) -> list[dict]:
     """
     Score all emails and return ranked list.
     Also updates stored emails with urgency scores.
+    Set use_llm=False for fast startup (rule-based scoring only).
     """
     emails = get_all_emails()
     scored = []
 
     for email in emails:
-        scores = score_email(email)
+        scores = score_email(email, use_llm=use_llm)
 
         # Update stored email with urgency score
         update_email(email["id"], {"urgency": scores["total_score"]})

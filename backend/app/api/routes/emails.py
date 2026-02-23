@@ -3,6 +3,9 @@ Email API routes.
 Handles email processing, retrieval, AI summaries, and reply generation.
 """
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from app.api.schemas.email_schema import (
@@ -23,16 +26,17 @@ from app.services.summary_service import generate_email_summary
 from app.services.priority_service import score_email
 from app.agents.reply_agent import generate_reply
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.post("/process", response_model=dict)
-def process_new_email(data: EmailProcessInput):
+async def process_new_email(data: EmailProcessInput):
     """
     Process a new incoming email.
     Stores it, generates AI summary, and calculates priority score.
     """
-    # Store the email
+    # Store the email (fast, no LLM involved)
     email = process_email(
         sender=data.sender,
         subject=data.subject,
@@ -42,17 +46,22 @@ def process_new_email(data: EmailProcessInput):
         sender_email=data.sender_email,
     )
 
-    # Generate AI summary
-    summary = generate_email_summary(
+    # Run AI summary + priority scoring CONCURRENTLY (both are LLM calls)
+    summary_task = asyncio.to_thread(
+        generate_email_summary,
         sender=data.sender,
         subject=data.subject,
         content=data.content,
     )
-    update_email(email["id"], {"ai_summary": summary})
+    score_task = asyncio.to_thread(score_email, email)
 
-    # Calculate priority score
-    scores = score_email(email)
-    update_email(email["id"], {"urgency": scores["total_score"]})
+    summary, scores = await asyncio.gather(summary_task, score_task)
+
+    # Apply results
+    update_email(email["id"], {
+        "ai_summary": summary,
+        "urgency": scores["total_score"],
+    })
 
     # Return updated email
     updated = get_email_by_id(email["id"])
